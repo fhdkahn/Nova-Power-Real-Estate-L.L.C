@@ -1,0 +1,2026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pile Construction Reporting Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 15px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .nav-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .nav-tab:hover {
+            background: #5a6fd8;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .pile-viewer {
+            position: relative;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .pile-layout {
+            width: 100%;
+            height: 800px;
+            background-image: url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-05-26%20at%202.17.09%E2%80%AFPM-g3SaHJ4BuHtJ67LYSqDLifIvYBcSDT.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            position: relative;
+            cursor: crosshair;
+            transform-origin: center center;
+            transition: transform 0.3s ease;
+        }
+
+        .pile-marker {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid #333;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+            transform: translate(-50%, -50%);
+            user-select: none;
+        }
+
+        .pile-marker:hover {
+            transform: translate(-50%, -50%) scale(1.5);
+            z-index: 10;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+        }
+
+        .pile-marker.pending {
+            background: #ffc107;
+            border-color: #e0a800;
+        }
+
+        .pile-marker.in-progress {
+            background: #17a2b8;
+            border-color: #138496;
+        }
+
+        .pile-marker.completed {
+            background: #28a745;
+            border-color: #1e7e34;
+            color: white;
+        }
+
+        .pile-marker.selected {
+            background: #dc3545;
+            border-color: #c82333;
+            color: white;
+            transform: translate(-50%, -50%) scale(1.8);
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            z-index: 15;
+        }
+
+        .pile-marker.dragging {
+            z-index: 1000;
+            transform: translate(-50%, -50%) scale(1.5);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            cursor: grabbing !important;
+        }
+
+        .pile-layout.edit-mode {
+            cursor: default;
+        }
+
+        .pile-layout.edit-mode .pile-marker {
+            cursor: grab;
+        }
+
+        .pile-layout.edit-mode .pile-marker:active {
+            cursor: grabbing;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .pile-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pile-info h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .summary-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+
+        .filters {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .filters h4 {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .report-section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .report-section h2 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            .container {
+                max-width: none;
+                padding: 0;
+            }
+            
+            .tab-content {
+                box-shadow: none;
+                border: none;
+            }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+        }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 5px;
+        }
+
+        .alert-info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .pile-search {
+            margin-bottom: 15px;
+        }
+
+        .pile-search input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .pile-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .pile-list-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pile-list-item:hover {
+            background: #f8f9fa;
+        }
+
+        .pile-list-item.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        .pile-status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid #333;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            border-radius: 5px;
+            padding: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        .zoom-controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .zoom-controls button:hover {
+            background: #5a6fd8;
+        }
+
+        .edit-mode-controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .edit-mode-controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .edit-mode-controls button:hover {
+            background: #5a6fd8;
+        }
+
+        .edit-mode-controls button.active {
+            background: #28a745;
+        }
+
+        .edit-mode-controls button.danger {
+            background: #dc3545;
+        }
+
+        .edit-mode-controls button.danger:hover {
+            background: #c82333;
+        }
+
+        .edit-instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .pile-coordinates {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ Pile Construction Reporting Tool</h1>
+            <p>Comprehensive site management and reporting system - 202 Piles Total</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showTab('pile-viewer')">🗺️ Pile Layout</button>
+            <button class="nav-tab" onclick="showTab('pile-list')">📋 Pile List</button>
+            <button class="nav-tab" onclick="showTab('daily-logs')">📅 Daily Logs</button>
+            <button class="nav-tab" onclick="showTab('reports')">📋 Reports</button>
+            <button class="nav-tab" onclick="showTab('data-management')">💾 Data Management</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <h3>Total Piles</h3>
+                    <div class="value" id="total-piles">202</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Completed</h3>
+                    <div class="value" id="completed-piles">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>In Progress</h3>
+                    <div class="value" id="progress-piles">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Pending</h3>
+                    <div class="value" id="pending-piles">202</div>
+                </div>
+            </div>
+
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <h3>Total Concrete (m³)</h3>
+                    <div class="value" id="total-concrete">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Total Steel (kg)</h3>
+                    <div class="value" id="total-steel">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Progress</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="overall-progress" style="width: 0%"></div>
+                    </div>
+                    <div class="value" id="progress-percentage">0%</div>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>Quick Start:</strong> Click on the "Pile Layout" tab to begin selecting and updating pile information. Use "Pile List" for detailed pile management or "Daily Logs" to track daily progress.
+            </div>
+        </div>
+
+        <!-- Pile Viewer Tab -->
+        <div id="pile-viewer" class="tab-content">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107; border-color: #e0a800;"></div>
+                    <span>Pending</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #17a2b8; border-color: #138496;"></div>
+                    <span>In Progress</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #28a745; border-color: #1e7e34;"></div>
+                    <span>Completed</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #dc3545; border-color: #c82333;"></div>
+                    <span>Selected</span>
+                </div>
+            </div>
+
+            <div class="filters">
+                <h4>Filters</h4>
+                <div class="filter-group">
+                    <label>Status:</label>
+                    <select id="status-filter" onchange="applyFilters()">
+                        <option value="all">All Piles</option>
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                    
+                    <label>Date:</label>
+                    <input type="date" id="date-filter" onchange="applyFilters()">
+                    
+                    <button class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
+                </div>
+            </div>
+
+            <div class="edit-instructions" id="edit-instructions" style="display: none;">
+                <strong>Edit Mode Active:</strong> Drag and drop pile markers to position them correctly on the drawing. Click "Save Positions" when done to permanently save the new locations.
+            </div>
+
+            <div class="pile-viewer">
+                <div class="zoom-controls">
+                    <button onclick="zoomIn()">+</button>
+                    <button onclick="zoomOut()">-</button>
+                    <button onclick="resetZoom()">Reset</button>
+                </div>
+                <div class="edit-mode-controls">
+                    <button id="edit-mode-btn" onclick="toggleEditMode()">📝 Edit Mode</button>
+                    <button onclick="savePositions()" style="display: none;" id="save-positions-btn">💾 Save Positions</button>
+                    <button onclick="resetPositions()" class="danger" style="display: none;" id="reset-positions-btn">🔄 Reset Positions</button>
+                    <span id="edit-mode-status" style="font-size: 12px; color: #666;">View Mode</span>
+                </div>
+                <div class="pile-layout" id="pile-layout"></div>
+                <div class="pile-coordinates" id="pile-coordinates"></div>
+            </div>
+
+            <div id="pile-info" class="pile-info" style="display: none;">
+                <h3>Pile Information</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Pile ID/Name:</label>
+                        <input type="text" id="pile-id" onchange="updatePileData()">
+                    </div>
+                    <div class="form-group">
+                        <label>Status:</label>
+                        <select id="pile-status" onchange="updatePileData()">
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Casting:</label>
+                        <input type="date" id="casting-date" onchange="updatePileData()">
+                    </div>
+                    <div class="form-group">
+                        <label>Concrete Volume (m³):</label>
+                        <input type="number" id="concrete-volume" step="0.1" onchange="updatePileData()">
+                    </div>
+                    <div class="form-group">
+                        <label>Steel Bars (kg):</label>
+                        <input type="number" id="steel-bars" step="0.1" onchange="updatePileData()">
+                    </div>
+                    <div class="form-group">
+                        <label>Steel Type:</label>
+                        <select id="steel-type" onchange="updatePileData()">
+                            <option value="Grade 60">Grade 60</option>
+                            <option value="Grade 40">Grade 40</option>
+                            <option value="Grade 75">Grade 75</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Remarks:</label>
+                    <textarea id="pile-remarks" rows="3" onchange="updatePileData()"></textarea>
+                </div>
+                <div>
+                    <button class="btn btn-success" onclick="savePileData()">Save Pile Data</button>
+                    <button class="btn btn-secondary" onclick="clearSelection()">Clear Selection</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pile List Tab -->
+        <div id="pile-list" class="tab-content">
+            <h2>Pile Management</h2>
+            
+            <div class="pile-search">
+                <input type="text" id="pile-search-input" placeholder="Search piles by ID/Name..." onkeyup="searchPiles()">
+            </div>
+
+            <div class="form-grid">
+                <div style="grid-column: 1 / -1;">
+                    <div class="pile-list" id="pile-list-container">
+                        <!-- Pile list will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="pile-detail-form" class="pile-info" style="display: none;">
+                <h3>Edit Pile Details</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Pile ID/Name:</label>
+                        <input type="text" id="list-pile-id" onchange="updateSelectedPileFromList()">
+                    </div>
+                    <div class="form-group">
+                        <label>Status:</label>
+                        <select id="list-pile-status" onchange="updateSelectedPileFromList()">
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Casting:</label>
+                        <input type="date" id="list-casting-date" onchange="updateSelectedPileFromList()">
+                    </div>
+                    <div class="form-group">
+                        <label>Concrete Volume (m³):</label>
+                        <input type="number" id="list-concrete-volume" step="0.1" onchange="updateSelectedPileFromList()">
+                    </div>
+                    <div class="form-group">
+                        <label>Steel Bars (kg):</label>
+                        <input type="number" id="list-steel-bars" step="0.1" onchange="updateSelectedPileFromList()">
+                    </div>
+                    <div class="form-group">
+                        <label>Steel Type:</label>
+                        <select id="list-steel-type" onchange="updateSelectedPileFromList()">
+                            <option value="Grade 60">Grade 60</option>
+                            <option value="Grade 40">Grade 40</option>
+                            <option value="Grade 75">Grade 75</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Remarks:</label>
+                    <textarea id="list-pile-remarks" rows="3" onchange="updateSelectedPileFromList()"></textarea>
+                </div>
+                <div>
+                    <button class="btn btn-success" onclick="savePileDataFromList()">Save Changes</button>
+                    <button class="btn btn-secondary" onclick="clearListSelection()">Clear Selection</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Logs Tab -->
+        <div id="daily-logs" class="tab-content">
+            <h2>Daily Casting Logs</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Date:</label>
+                    <input type="date" id="log-date" value="">
+                </div>
+                <div class="form-group">
+                    <label>Number of Piles Cast:</label>
+                    <input type="number" id="log-piles-count" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Concrete Quantity (m³):</label>
+                    <input type="number" id="log-concrete" step="0.1" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Steel Used (kg):</label>
+                    <input type="number" id="log-steel" step="0.1" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Steel Type:</label>
+                    <select id="log-steel-type">
+                        <option value="Grade 60">Grade 60</option>
+                        <option value="Grade 40">Grade 40</option>
+                        <option value="Grade 75">Grade 75</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Notes:</label>
+                <textarea id="log-notes" rows="3" placeholder="Daily progress notes, weather conditions, issues encountered, etc."></textarea>
+            </div>
+            
+            <div>
+                <button class="btn btn-primary" onclick="addDailyLog()">Add Daily Log</button>
+                <button class="btn btn-secondary" onclick="clearLogForm()">Clear Form</button>
+            </div>
+
+            <table class="data-table" id="daily-logs-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Piles Cast</th>
+                        <th>Concrete (m³)</th>
+                        <th>Steel (kg)</th>
+                        <th>Steel Type</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="daily-logs-tbody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reports" class="tab-content">
+            <div class="no-print">
+                <h2>Generate Reports</h2>
+                <div>
+                    <button class="btn btn-primary" onclick="generateHTMLReport()">📄 View HTML Report</button>
+                    <button class="btn btn-success" onclick="generatePDFReport()">📑 Download PDF Report</button>
+                    <button class="btn btn-secondary" onclick="printReport()">🖨️ Print Report</button>
+                </div>
+                <hr style="margin: 20px 0;">
+            </div>
+
+            <div id="report-content">
+                <div class="report-section">
+                    <h2>Project Summary</h2>
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <h3>Project Progress</h3>
+                            <div class="value" id="report-progress">0%</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Total Piles</h3>
+                            <div class="value" id="report-total-piles">202</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Completed Piles</h3>
+                            <div class="value" id="report-completed-piles">0</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Total Concrete Used</h3>
+                            <div class="value" id="report-total-concrete">0 m³</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <h2>Material Usage Summary</h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th>Total Quantity</th>
+                                <th>Unit</th>
+                                <th>Average per Pile</th>
+                            </tr>
+                        </thead>
+                        <tbody id="material-summary-tbody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="report-section">
+                    <h2>Daily Progress Report</h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Piles Cast</th>
+                                <th>Concrete Used (m³)</th>
+                                <th>Steel Used (kg)</th>
+                                <th>Cumulative Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody id="daily-progress-tbody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="report-section">
+                    <h2>Pile Status Details</h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Pile ID</th>
+                                <th>Status</th>
+                                <th>Casting Date</th>
+                                <th>Concrete (m³)</th>
+                                <th>Steel (kg)</th>
+                                <th>Steel Type</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pile-status-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Management Tab -->
+        <div id="data-management" class="tab-content">
+            <h2>Data Management</h2>
+            
+            <div class="form-grid">
+                <div class="summary-card">
+                    <h3>Export Data</h3>
+                    <p>Download all project data as JSON file</p>
+                    <button class="btn btn-primary" onclick="exportData()">📥 Export Data</button>
+                </div>
+                
+                <div class="summary-card">
+                    <h3>Import Data</h3>
+                    <p>Load project data from JSON file</p>
+                    <input type="file" id="import-file" accept=".json" style="margin-bottom: 10px;">
+                    <button class="btn btn-success" onclick="importData()">📤 Import Data</button>
+                </div>
+                
+                <div class="summary-card">
+                    <h3>Reset Data</h3>
+                    <p>Clear all project data (cannot be undone)</p>
+                    <button class="btn btn-danger" onclick="resetAllData()">🗑️ Reset All Data</button>
+                </div>
+                
+                <div class="summary-card">
+                    <h3>Auto-Save</h3>
+                    <p>Data is automatically saved to browser storage</p>
+                    <div class="alert alert-success">✅ Auto-save is active</div>
+                </div>
+            </div>
+
+            <div class="report-section">
+                <h2>Data Statistics</h2>
+                <table class="data-table">
+                    <tbody>
+                        <tr>
+                            <td><strong>Total Piles Defined:</strong></td>
+                            <td id="stats-total-piles">202</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Daily Logs Recorded:</strong></td>
+                            <td id="stats-daily-logs">0</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Last Updated:</strong></td>
+                            <td id="stats-last-updated">Never</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data Size:</strong></td>
+                            <td id="stats-data-size">0 KB</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pile Detail Modal -->
+    <div id="pile-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePileModal()">&times;</span>
+            <h2>Pile Details</h2>
+            <div id="modal-pile-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let pileData = {};
+        let dailyLogs = [];
+        let selectedPile = null;
+        let selectedListPile = null;
+        let pilePositions = [];
+        let zoomLevel = 1;
+        let editMode = false;
+        let draggedPile = null;
+        let isDragging = false;
+        let originalPositions = {};
+
+        // Toggle edit mode
+        function toggleEditMode() {
+            editMode = !editMode;
+            const btn = document.getElementById('edit-mode-btn');
+            const saveBtn = document.getElementById('save-positions-btn');
+            const resetBtn = document.getElementById('reset-positions-btn');
+            const status = document.getElementById('edit-mode-status');
+            const instructions = document.getElementById('edit-instructions');
+            const layout = document.getElementById('pile-layout');
+            
+            console.log('Toggling edit mode to:', editMode);
+            
+            if (editMode) {
+                btn.textContent = '👁️ View Mode';
+                btn.classList.add('active');
+                saveBtn.style.display = 'inline-block';
+                resetBtn.style.display = 'inline-block';
+                status.textContent = 'Edit Mode - Drag piles to reposition';
+                status.style.color = '#28a745';
+                instructions.style.display = 'block';
+                layout.classList.add('edit-mode');
+                
+                // Store original positions for reset
+                originalPositions = JSON.parse(JSON.stringify(pileData));
+                
+                // Enable dragging for all pile markers
+                enableDragging();
+                
+            } else {
+                btn.textContent = '📝 Edit Mode';
+                btn.classList.remove('active');
+                saveBtn.style.display = 'none';
+                resetBtn.style.display = 'none';
+                status.textContent = 'View Mode';
+                status.style.color = '#666';
+                instructions.style.display = 'none';
+                layout.classList.remove('edit-mode');
+                
+                // Disable dragging
+                disableDragging();
+                
+                // Hide coordinates
+                document.getElementById('pile-coordinates').style.display = 'none';
+            }
+        }
+
+        // Enable dragging functionality
+        function enableDragging() {
+            const markers = document.querySelectorAll('.pile-marker');
+            markers.forEach(marker => {
+                marker.style.cursor = 'grab';
+                marker.addEventListener('mousedown', startDrag);
+                marker.addEventListener('touchstart', startDrag);
+            });
+            
+            // Add global event listeners
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchmove', drag);
+            document.addEventListener('touchend', endDrag);
+        }
+
+        // Disable dragging functionality
+        function disableDragging() {
+            const markers = document.querySelectorAll('.pile-marker');
+            markers.forEach(marker => {
+                marker.style.cursor = 'pointer';
+                marker.removeEventListener('mousedown', startDrag);
+                marker.removeEventListener('touchstart', startDrag);
+            });
+            
+            // Remove global event listeners
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', endDrag);
+            document.removeEventListener('touchmove', drag);
+            document.removeEventListener('touchend', endDrag);
+            
+            // Clear dragging state
+            if (draggedPile) {
+                draggedPile.classList.remove('dragging');
+                draggedPile = null;
+            }
+            isDragging = false;
+        }
+
+        // Start dragging
+        function startDrag(e) {
+            if (!editMode) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            draggedPile = e.target;
+            isDragging = true;
+            
+            draggedPile.classList.add('dragging');
+            draggedPile.style.cursor = 'grabbing';
+            
+            // Show coordinates
+            document.getElementById('pile-coordinates').style.display = 'block';
+            
+            console.log('Started dragging pile:', draggedPile.dataset.pileId);
+        }
+
+        // Drag pile
+        function drag(e) {
+            if (!editMode || !isDragging || !draggedPile) return;
+            
+            e.preventDefault();
+            
+            const layout = document.getElementById('pile-layout');
+            const layoutRect = layout.getBoundingClientRect();
+            
+            // Get client coordinates (mouse or touch)
+            const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY);
+            
+            if (!clientX || !clientY) return;
+            
+            // Calculate position relative to layout
+            const x = ((clientX - layoutRect.left) / layoutRect.width) * 100;
+            const y = ((clientY - layoutRect.top) / layoutRect.height) * 100;
+            
+            // Constrain to layout bounds
+            const constrainedX = Math.max(1, Math.min(99, x));
+            const constrainedY = Math.max(1, Math.min(99, y));
+            
+            // Update pile position
+            draggedPile.style.left = constrainedX + '%';
+            draggedPile.style.top = constrainedY + '%';
+            
+            // Update coordinates display
+            const coords = document.getElementById('pile-coordinates');
+            coords.textContent = `${draggedPile.dataset.pileId}: X: ${constrainedX.toFixed(1)}%, Y: ${constrainedY.toFixed(1)}%`;
+        }
+
+        // End dragging
+        function endDrag(e) {
+            if (!editMode || !isDragging || !draggedPile) return;
+            
+            const pileId = draggedPile.dataset.pileId;
+            
+            // Calculate final position
+            const x = parseFloat(draggedPile.style.left) || 0;
+            const y = parseFloat(draggedPile.style.top) || 0;
+            
+            // Update pile data with new position
+            if (pileData[pileId]) {
+                pileData[pileId].x = x;
+                pileData[pileId].y = y;
+            }
+            
+            // Update pile positions array
+            const pilePos = pilePositions.find(p => p.id === pileId);
+            if (pilePos) {
+                pilePos.x = x;
+                pilePos.y = y;
+            }
+            
+            console.log(`Updated ${pileId} position to: ${x.toFixed(1)}%, ${y.toFixed(1)}%`);
+            
+            // Clean up dragging state
+            draggedPile.classList.remove('dragging');
+            draggedPile.style.cursor = 'grab';
+            draggedPile = null;
+            isDragging = false;
+            
+            // Hide coordinates
+            document.getElementById('pile-coordinates').style.display = 'none';
+            
+            // Auto-save during edit mode
+            saveData();
+        }
+
+        // Save positions permanently
+        function savePositions() {
+            if (!editMode) return;
+            
+            saveData();
+            alert('Pile positions saved successfully!');
+            
+            // Update original positions to current positions
+            originalPositions = JSON.parse(JSON.stringify(pileData));
+            
+            console.log('Positions saved');
+        }
+
+        // Reset positions to original
+        function resetPositions() {
+            if (!editMode) return;
+            
+            if (confirm('Are you sure you want to reset all pile positions to their original locations?')) {
+                // Restore original positions
+                Object.keys(originalPositions).forEach(pileId => {
+                    if (pileData[pileId] && originalPositions[pileId]) {
+                        pileData[pileId].x = originalPositions[pileId].x;
+                        pileData[pileId].y = originalPositions[pileId].y;
+                        
+                        // Update pile positions array
+                        const pilePos = pilePositions.find(p => p.id === pileId);
+                        if (pilePos) {
+                            pilePos.x = originalPositions[pileId].x;
+                            pilePos.y = originalPositions[pileId].y;
+                        }
+                    }
+                });
+                
+                // Re-render markers
+                renderPileMarkers();
+                saveData();
+                
+                alert('Pile positions reset to original locations!');
+                console.log('Positions reset');
+            }
+        }
+
+        // Zoom functions
+        function zoomIn() {
+            zoomLevel = Math.min(zoomLevel * 1.2, 3);
+            applyZoom();
+            console.log('Zoomed in to:', zoomLevel);
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(zoomLevel / 1.2, 0.5);
+            applyZoom();
+            console.log('Zoomed out to:', zoomLevel);
+        }
+
+        function resetZoom() {
+            zoomLevel = 1;
+            applyZoom();
+            console.log('Zoom reset to:', zoomLevel);
+        }
+
+        function applyZoom() {
+            const layout = document.getElementById('pile-layout');
+            layout.style.transform = `scale(${zoomLevel})`;
+        }
+
+        // Render pile markers on the layout
+        function renderPileMarkers() {
+            const layout = document.getElementById('pile-layout');
+            
+            // Clear existing markers
+            const existingMarkers = layout.querySelectorAll('.pile-marker');
+            existingMarkers.forEach(marker => marker.remove());
+
+            // Add new markers using saved positions
+            pilePositions.forEach(pile => {
+                const marker = document.createElement('div');
+                marker.className = 'pile-marker';
+                marker.dataset.pileId = pile.id;
+                
+                // Use saved position from pileData if available, otherwise use default
+                const savedPile = pileData[pile.id];
+                const x = savedPile && savedPile.x !== undefined ? savedPile.x : pile.x;
+                const y = savedPile && savedPile.y !== undefined ? savedPile.y : pile.y;
+                
+                marker.style.left = x + '%';
+                marker.style.top = y + '%';
+                marker.title = (savedPile && savedPile.name) || pile.id;
+                
+                // Set status class
+                if (savedPile) {
+                    marker.classList.add(savedPile.status);
+                }
+                
+                // Add click event for selection (only in view mode)
+                marker.addEventListener('click', function(e) {
+                    if (!editMode) {
+                        e.stopPropagation();
+                        selectPile(pile.id);
+                    }
+                });
+                
+                layout.appendChild(marker);
+            });
+            
+            // Re-enable dragging if in edit mode
+            if (editMode) {
+                enableDragging();
+            }
+            
+            console.log('Rendered', pilePositions.length, 'pile markers');
+        }
+
+        // Handle pile selection
+        function selectPile(pileId) {
+            if (editMode) return; // Prevent selection during edit mode
+            
+            selectedPile = pileId;
+            
+            // Update visual selection
+            document.querySelectorAll('.pile-marker').forEach(marker => {
+                marker.classList.remove('selected');
+            });
+            
+            const selectedMarker = document.querySelector(`[data-pile-id="${pileId}"]`);
+            if (selectedMarker) {
+                selectedMarker.classList.add('selected');
+            }
+            
+            // Show pile information form
+            showPileInfo(pileId);
+            
+            console.log('Selected pile:', pileId);
+        }
+
+        // Show pile information form
+        function showPileInfo(pileId) {
+            const pileInfo = pileData[pileId];
+            const infoDiv = document.getElementById('pile-info');
+            
+            document.getElementById('pile-id').value = pileInfo.name || pileInfo.id;
+            document.getElementById('pile-status').value = pileInfo.status;
+            document.getElementById('casting-date').value = pileInfo.castingDate;
+            document.getElementById('concrete-volume').value = pileInfo.concreteVolume;
+            document.getElementById('steel-bars').value = pileInfo.steelBars;
+            document.getElementById('steel-type').value = pileInfo.steelType;
+            document.getElementById('pile-remarks').value = pileInfo.remarks;
+            
+            infoDiv.style.display = 'block';
+        }
+
+        // Update pile data
+        function updatePileData() {
+            if (!selectedPile) return;
+            
+            const pileInfo = pileData[selectedPile];
+            pileInfo.name = document.getElementById('pile-id').value;
+            pileInfo.status = document.getElementById('pile-status').value;
+            pileInfo.castingDate = document.getElementById('casting-date').value;
+            pileInfo.concreteVolume = parseFloat(document.getElementById('concrete-volume').value) || 0;
+            pileInfo.steelBars = parseFloat(document.getElementById('steel-bars').value) || 0;
+            pileInfo.steelType = document.getElementById('steel-type').value;
+            pileInfo.remarks = document.getElementById('pile-remarks').value;
+            
+            // Update marker appearance
+            const marker = document.querySelector(`[data-pile-id="${selectedPile}"]`);
+            if (marker) {
+                marker.className = 'pile-marker selected ' + pileInfo.status;
+                marker.title = pileInfo.name || pileInfo.id;
+            }
+            
+            saveData();
+            updateDashboard();
+            renderPileList();
+        }
+
+        // Save pile data
+        function savePileData() {
+            updatePileData();
+            alert('Pile data saved successfully!');
+        }
+
+        // Clear selection
+        function clearSelection() {
+            selectedPile = null;
+            document.getElementById('pile-info').style.display = 'none';
+            document.querySelectorAll('.pile-marker').forEach(marker => {
+                marker.classList.remove('selected');
+            });
+        }
+
+        // Render pile list
+        function renderPileList() {
+            const container = document.getElementById('pile-list-container');
+            container.innerHTML = '';
+
+            Object.values(pileData).forEach(pile => {
+                const item = document.createElement('div');
+                item.className = 'pile-list-item';
+                item.dataset.pileId = pile.id;
+                
+                const statusIndicator = document.createElement('div');
+                statusIndicator.className = 'pile-status-indicator';
+                statusIndicator.classList.add(pile.status);
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = pile.name || pile.id;
+                
+                const statusSpan = document.createElement('span');
+                statusSpan.textContent = pile.status.charAt(0).toUpperCase() + pile.status.slice(1);
+                statusSpan.style.fontSize = '12px';
+                statusSpan.style.color = '#666';
+                
+                const leftDiv = document.createElement('div');
+                leftDiv.style.display = 'flex';
+                leftDiv.style.alignItems = 'center';
+                leftDiv.style.gap = '10px';
+                leftDiv.appendChild(statusIndicator);
+                leftDiv.appendChild(nameSpan);
+                
+                item.appendChild(leftDiv);
+                item.appendChild(statusSpan);
+                
+                item.addEventListener('click', function() {
+                    selectPileFromList(pile.id);
+                });
+                
+                container.appendChild(item);
+            });
+        }
+
+        // Search piles
+        function searchPiles() {
+            const searchTerm = document.getElementById('pile-search-input').value.toLowerCase();
+            const items = document.querySelectorAll('.pile-list-item');
+            
+            items.forEach(item => {
+                const pileId = item.dataset.pileId;
+                const pile = pileData[pileId];
+                const searchText = (pile.name || pile.id).toLowerCase();
+                
+                if (searchText.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // Select pile from list
+        function selectPileFromList(pileId) {
+            selectedListPile = pileId;
+            
+            // Update visual selection in list
+            document.querySelectorAll('.pile-list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            const selectedItem = document.querySelector(`[data-pile-id="${pileId}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('selected');
+            }
+            
+            // Show pile detail form
+            showPileDetailForm(pileId);
+        }
+
+        // Show pile detail form
+        function showPileDetailForm(pileId) {
+            const pile = pileData[pileId];
+            const form = document.getElementById('pile-detail-form');
+            
+            document.getElementById('list-pile-id').value = pile.name || pile.id;
+            document.getElementById('list-pile-status').value = pile.status;
+            document.getElementById('list-casting-date').value = pile.castingDate;
+            document.getElementById('list-concrete-volume').value = pile.concreteVolume;
+            document.getElementById('list-steel-bars').value = pile.steelBars;
+            document.getElementById('list-steel-type').value = pile.steelType;
+            document.getElementById('list-pile-remarks').value = pile.remarks;
+            
+            form.style.display = 'block';
+        }
+
+        // Update selected pile from list
+        function updateSelectedPileFromList() {
+            if (!selectedListPile) return;
+            
+            const pile = pileData[selectedListPile];
+            pile.name = document.getElementById('list-pile-id').value;
+            pile.status = document.getElementById('list-pile-status').value;
+            pile.castingDate = document.getElementById('list-casting-date').value;
+            pile.concreteVolume = parseFloat(document.getElementById('list-concrete-volume').value) || 0;
+            pile.steelBars = parseFloat(document.getElementById('list-steel-bars').value) || 0;
+            pile.steelType = document.getElementById('list-steel-type').value;
+            pile.remarks = document.getElementById('list-pile-remarks').value;
+            
+            saveData();
+            updateDashboard();
+            renderPileList();
+            renderPileMarkers();
+        }
+
+        // Save pile data from list
+        function savePileDataFromList() {
+            updateSelectedPileFromList();
+            alert('Pile data saved successfully!');
+        }
+
+        // Clear list selection
+        function clearListSelection() {
+            selectedListPile = null;
+            document.getElementById('pile-detail-form').style.display = 'none';
+            document.querySelectorAll('.pile-list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+        }
+
+        // Add daily log
+        function addDailyLog() {
+            const date = document.getElementById('log-date').value;
+            const pilesCount = parseInt(document.getElementById('log-piles-count').value) || 0;
+            const concrete = parseFloat(document.getElementById('log-concrete').value) || 0;
+            const steel = parseFloat(document.getElementById('log-steel').value) || 0;
+            const steelType = document.getElementById('log-steel-type').value;
+            const notes = document.getElementById('log-notes').value;
+            
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            
+            const log = {
+                date: date,
+                pilesCount: pilesCount,
+                concrete: concrete,
+                steel: steel,
+                steelType: steelType,
+                notes: notes,
+                timestamp: new Date().toISOString()
+            };
+            
+            dailyLogs.push(log);
+            dailyLogs.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            renderDailyLogs();
+            clearLogForm();
+            saveData();
+            updateDashboard();
+            
+            alert('Daily log added successfully!');
+        }
+
+        // Clear log form
+        function clearLogForm() {
+            document.getElementById('log-piles-count').value = '';
+            document.getElementById('log-concrete').value = '';
+            document.getElementById('log-steel').value = '';
+            document.getElementById('log-notes').value = '';
+        }
+
+        // Render daily logs table
+        function renderDailyLogs() {
+            const tbody = document.getElementById('daily-logs-tbody');
+            tbody.innerHTML = '';
+            
+            dailyLogs.forEach((log, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${log.date}</td>
+                    <td>${log.pilesCount}</td>
+                    <td>${log.concrete}</td>
+                    <td>${log.steel}</td>
+                    <td>${log.steelType}</td>
+                    <td>${log.notes}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteDailyLog(${index})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Delete daily log
+        function deleteDailyLog(index) {
+            if (confirm('Are you sure you want to delete this log?')) {
+                dailyLogs.splice(index, 1);
+                renderDailyLogs();
+                saveData();
+                updateDashboard();
+            }
+        }
+
+        // Update dashboard
+        function updateDashboard() {
+            const totalPiles = 202; // Fixed total
+            const completedPiles = Object.values(pileData).filter(p => p.status === 'completed').length;
+            const progressPiles = Object.values(pileData).filter(p => p.status === 'in-progress').length;
+            const pendingPiles = Object.values(pileData).filter(p => p.status === 'pending').length;
+            
+            const totalConcrete = Object.values(pileData).reduce((sum, p) => sum + (p.concreteVolume || 0), 0);
+            const totalSteel = Object.values(pileData).reduce((sum, p) => sum + (p.steelBars || 0), 0);
+            
+            const progressPercentage = totalPiles > 0 ? Math.round((completedPiles / totalPiles) * 100) : 0;
+            
+            document.getElementById('total-piles').textContent = totalPiles;
+            document.getElementById('completed-piles').textContent = completedPiles;
+            document.getElementById('progress-piles').textContent = progressPiles;
+            document.getElementById('pending-piles').textContent = pendingPiles;
+            document.getElementById('total-concrete').textContent = totalConcrete.toFixed(1);
+            document.getElementById('total-steel').textContent = totalSteel.toFixed(1);
+            document.getElementById('progress-percentage').textContent = progressPercentage + '%';
+            document.getElementById('overall-progress').style.width = progressPercentage + '%';
+            
+            // Update stats
+            document.getElementById('stats-total-piles').textContent = totalPiles;
+            document.getElementById('stats-daily-logs').textContent = dailyLogs.length;
+            document.getElementById('stats-last-updated').textContent = new Date().toLocaleString();
+            
+            const dataSize = JSON.stringify({pileData, dailyLogs}).length;
+            document.getElementById('stats-data-size').textContent = (dataSize / 1024).toFixed(1) + ' KB';
+        }
+
+        // Generate HTML report
+        function generateHTMLReport() {
+            updateReportContent();
+            showTab('reports');
+        }
+
+        // Update report content
+        function updateReportContent() {
+            const totalPiles = 202;
+            const completedPiles = Object.values(pileData).filter(p => p.status === 'completed').length;
+            const totalConcrete = Object.values(pileData).reduce((sum, p) => sum + (p.concreteVolume || 0), 0);
+            const totalSteel = Object.values(pileData).reduce((sum, p) => sum + (p.steelBars || 0), 0);
+            const progressPercentage = totalPiles > 0 ? Math.round((completedPiles / totalPiles) * 100) : 0;
+            
+            // Update summary
+            document.getElementById('report-progress').textContent = progressPercentage + '%';
+            document.getElementById('report-total-piles').textContent = totalPiles;
+            document.getElementById('report-completed-piles').textContent = completedPiles;
+            document.getElementById('report-total-concrete').textContent = totalConcrete.toFixed(1) + ' m³';
+            
+            // Material summary
+            const materialSummary = document.getElementById('material-summary-tbody');
+            materialSummary.innerHTML = `
+                <tr>
+                    <td>Concrete</td>
+                    <td>${totalConcrete.toFixed(1)}</td>
+                    <td>m³</td>
+                    <td>${completedPiles > 0 ? (totalConcrete / completedPiles).toFixed(2) : '0'}</td>
+                </tr>
+                <tr>
+                    <td>Steel Reinforcement</td>
+                    <td>${totalSteel.toFixed(1)}</td>
+                    <td>kg</td>
+                    <td>${completedPiles > 0 ? (totalSteel / completedPiles).toFixed(2) : '0'}</td>
+                </tr>
+            `;
+            
+            // Daily progress
+            const dailyProgress = document.getElementById('daily-progress-tbody');
+            dailyProgress.innerHTML = '';
+            let cumulativePiles = 0;
+            
+            dailyLogs.forEach(log => {
+                cumulativePiles += log.pilesCount;
+                const cumulativeProgress = totalPiles > 0 ? Math.round((cumulativePiles / totalPiles) * 100) : 0;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${log.date}</td>
+                    <td>${log.pilesCount}</td>
+                    <td>${log.concrete}</td>
+                    <td>${log.steel}</td>
+                    <td>${cumulativeProgress}%</td>
+                `;
+                dailyProgress.appendChild(row);
+            });
+            
+            // Pile status details
+            const pileStatus = document.getElementById('pile-status-tbody');
+            pileStatus.innerHTML = '';
+            
+            Object.values(pileData).forEach(pile => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${pile.name || pile.id}</td>
+                    <td><span class="status-${pile.status}">${pile.status.charAt(0).toUpperCase() + pile.status.slice(1)}</span></td>
+                    <td>${pile.castingDate || 'N/A'}</td>
+                    <td>${pile.concreteVolume || 0}</td>
+                    <td>${pile.steelBars || 0}</td>
+                    <td>${pile.steelType}</td>
+                    <td>${pile.remarks || 'N/A'}</td>
+                `;
+                pileStatus.appendChild(row);
+            });
+        }
+
+        // Generate PDF report
+        function generatePDFReport() {
+            updateReportContent();
+            
+            const element = document.getElementById('report-content');
+            const opt = {
+                margin: 1,
+                filename: `pile-construction-report-${new Date().toISOString().split('T')[0]}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // Print report
+        function printReport() {
+            updateReportContent();
+            window.print();
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const statusFilter = document.getElementById('status-filter').value;
+            const dateFilter = document.getElementById('date-filter').value;
+            
+            document.querySelectorAll('.pile-marker').forEach(marker => {
+                const pileId = marker.dataset.pileId;
+                const pile = pileData[pileId];
+                let show = true;
+                
+                if (statusFilter !== 'all' && pile.status !== statusFilter) {
+                    show = false;
+                }
+                
+                if (dateFilter && pile.castingDate !== dateFilter) {
+                    show = false;
+                }
+                
+                marker.style.display = show ? 'flex' : 'none';
+            });
+        }
+
+        // Clear filters
+        function clearFilters() {
+            document.getElementById('status-filter').value = 'all';
+            document.getElementById('date-filter').value = '';
+            applyFilters();
+        }
+
+        // Tab navigation
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to the clicked tab
+            event.target.classList.add('active');
+            
+            // Update content if needed
+            if (tabName === 'daily-logs') {
+                renderDailyLogs();
+            } else if (tabName === 'reports') {
+                updateReportContent();
+            } else if (tabName === 'pile-list') {
+                renderPileList();
+            }
+        }
+
+        // Data management functions
+        function saveData() {
+            const data = {
+                pileData: pileData,
+                dailyLogs: dailyLogs,
+                lastUpdated: new Date().toISOString()
+            };
+            localStorage.setItem('pileConstructionData', JSON.stringify(data));
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem('pileConstructionData');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                pileData = data.pileData || {};
+                dailyLogs = data.dailyLogs || [];
+            }
+        }
+
+        function exportData() {
+            const data = {
+                pileData: pileData,
+                dailyLogs: dailyLogs,
+                exportDate: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pile-construction-data-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file to import');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.pileData && data.dailyLogs) {
+                        pileData = data.pileData;
+                        dailyLogs = data.dailyLogs;
+                        
+                        saveData();
+                        updateDashboard();
+                        renderPileMarkers();
+                        renderDailyLogs();
+                        renderPileList();
+                        
+                        alert('Data imported successfully!');
+                    } else {
+                        alert('Invalid file format');
+                    }
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetAllData() {
+            if (confirm('Are you sure you want to reset all data? This action cannot be undone.')) {
+                pileData = {};
+                dailyLogs = [];
+                selectedPile = null;
+                selectedListPile = null;
+                
+                // Reinitialize pile positions
+                initializePilePositions();
+                
+                localStorage.removeItem('pileConstructionData');
+                updateDashboard();
+                renderPileMarkers();
+                renderDailyLogs();
+                renderPileList();
+                clearSelection();
+                clearListSelection();
+                
+                alert('All data has been reset');
+            }
+        }
+
+        // Close pile modal
+        function closePileModal() {
+            document.getElementById('pile-modal').style.display = 'none';
+        }
+
+        // Window click handler for modal
+        window.onclick = function(event) {
+            const modal = document.getElementById('pile-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing Pile Construction Tool...');
+            
+            // Set today's date as default
+            document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
+            
+            // Load saved data
+            loadData();
+            
+            // Initialize pile positions with accurate mapping to the drawing
+            initializePilePositions();
+            
+            // Update dashboard
+            updateDashboard();
+            
+            // Render pile markers
+            renderPileMarkers();
+            
+            // Render pile list
+            renderPileList();
+            
+            console.log('Initialization complete');
+        });
+
+        // Initialize pile positions based on the actual layout drawing
+        function initializePilePositions() {
+            // Accurately mapped pile positions based on the provided drawing
+            // These coordinates are mapped to match the actual pile locations in the image
+            const pilePositions202 = [
+                // Main central grid (P1 series - horizontal rows)
+                {id: 'P1-1', x: 15.5, y: 88.5}, {id: 'P1-2', x: 18.5, y: 88.5}, {id: 'P1-3', x: 21.5, y: 88.5}, 
+                {id: 'P1-4', x: 24.5, y: 88.5}, {id: 'P1-5', x: 27.5, y: 88.5}, {id: 'P1-6', x: 30.5, y: 88.5},
+                {id: 'P1-7', x: 33.5, y: 88.5}, {id: 'P1-8', x: 36.5, y: 88.5}, {id: 'P1-9', x: 39.5, y: 88.5},
+                {id: 'P1-10', x: 42.5, y: 88.5}, {id: 'P1-11', x: 45.5, y: 88.5}, {id: 'P1-12', x: 48.5, y: 88.5},
+                {id: 'P1-13', x: 51.5, y: 88.5}, {id: 'P1-14', x: 54.5, y: 88.5}, {id: 'P1-15', x: 57.5, y: 88.5},
+                {id: 'P1-16', x: 60.5, y: 88.5}, {id: 'P1-17', x: 63.5, y: 88.5}, {id: 'P1-18', x: 66.5, y: 88.5},
+                {id: 'P1-19', x: 69.5, y: 88.5}, {id: 'P1-20', x: 72.5, y: 88.5}, {id: 'P1-21', x: 75.5, y: 88.5},
+                {id: 'P1-22', x: 78.5, y: 88.5}, {id: 'P1-23', x: 81.5, y: 88.5}, {id: 'P1-24', x: 84.5, y: 88.5},
+                {id: 'P1-25', x: 87.5, y: 88.5}, {id: 'P1-26', x: 90.5, y: 88.5}, {id: 'P1-27', x: 93.5, y: 88.5},
+
+                // P2 series (second row)
+                {id: 'P2-1', x: 15.5, y: 79.5}, {id: 'P2-2', x: 18.5, y: 79.5}, {id: 'P2-3', x: 21.5, y: 79.5},
+                {id: 'P2-4', x: 24.5, y: 79.5}, {id: 'P2-5', x: 27.5, y: 79.5}, {id: 'P2-6', x: 30.5, y: 79.5},
+                {id: 'P2-7', x: 33.5, y: 79.5}, {id: 'P2-8', x: 36.5, y: 79.5}, {id: 'P2-9', x: 39.5, y: 79.5},
+                {id: 'P2-10', x: 42.5, y: 79.5}, {id: 'P2-11', x: 45.5, y: 79.5}, {id: 'P2-12', x: 48.5, y: 79.5},
+                {id: 'P2-13', x: 51.5, y: 79.5}, {id: 'P2-14', x: 54.5, y: 79.5}, {id: 'P2-15', x: 57.5, y: 79.5},
+                {id: 'P2-16', x: 60.5, y: 79.5}, {id: 'P2-17', x: 63.5, y: 79.5}, {id: 'P2-18', x: 66.5, y: 79.5},
+                {id: 'P2-19', x: 69.5, y: 79.5}, {id: 'P2-20', x: 72.5, y: 79.5}, {id: 'P2-21', x: 75.5, y: 79.5},
+                {id: 'P2-22', x: 78.5, y: 79.5}, {id: 'P2-23', x: 81.5, y: 79.5}, {id: 'P2-24', x: 84.5, y: 79.5},
+                {id: 'P2-25', x: 87.5, y: 79.5}, {id: 'P2-26', x: 90.5, y: 79.5}, {id: 'P2-27', x: 93.5, y: 79.5},
+
+                // P3 series (third row)
+                {id: 'P3-1', x: 15.5, y: 70.5}, {id: 'P3-2', x: 18.5, y: 70.5}, {id: 'P3-3', x: 21.5, y: 70.5},
+                {id: 'P3-4', x: 24.5, y: 70.5}, {id: 'P3-5', x: 27.5, y: 70.5}, {id: 'P3-6', x: 30.5, y: 70.5},
+                {id: 'P3-7', x: 33.5, y: 70.5}, {id: 'P3-8', x: 36.5, y: 70.5}, {id: 'P3-9', x: 39.5, y: 70.5},
+                {id: 'P3-10', x: 42.5, y: 70.5}, {id: 'P3-11', x: 45.5, y: 70.5}, {id: 'P3-12', x: 48.5, y: 70.5},
+                {id: 'P3-13', x: 51.5, y: 70.5}, {id: 'P3-14', x: 54.5, y: 70.5}, {id: 'P3-15', x: 57.5, y: 70.5},
+                {id: 'P3-16', x: 60.5, y: 70.5}, {id: 'P3-17', x: 63.5, y: 70.5}, {id: 'P3-18', x: 66.5, y: 70.5},
+                {id: 'P3-19', x: 69.5, y: 70.5}, {id: 'P3-20', x: 72.5, y: 70.5}, {id: 'P3-21', x: 75.5, y: 70.5},
+                {id: 'P3-22', x: 78.5, y: 70.5}, {id: 'P3-23', x: 81.5, y: 70.5}, {id: 'P3-24', x: 84.5, y: 70.5},
+                {id: 'P3-25', x: 87.5, y: 70.5}, {id: 'P3-26', x: 90.5, y: 70.5}, {id: 'P3-27', x: 93.5, y: 70.5},
+
+                // P4 series (fourth row)
+                {id: 'P4-1', x: 15.5, y: 61.5}, {id: 'P4-2', x: 18.5, y: 61.5}, {id: 'P4-3', x: 21.5, y: 61.5},
+                {id: 'P4-4', x: 24.5, y: 61.5}, {id: 'P4-5', x: 27.5, y: 61.5}, {id: 'P4-6', x: 30.5, y: 61.5},
+                {id: 'P4-7', x: 33.5, y: 61.5}, {id: 'P4-8', x: 36.5, y: 61.5}, {id: 'P4-9', x: 39.5, y: 61.5},
+                {id: 'P4-10', x: 42.5, y: 61.5}, {id: 'P4-11', x: 45.5, y: 61.5}, {id: 'P4-12', x: 48.5, y: 61.5},
+                {id: 'P4-13', x: 51.5, y: 61.5}, {id: 'P4-14', x: 54.5, y: 61.5}, {id: 'P4-15', x: 57.5, y: 61.5},
+                {id: 'P4-16', x: 60.5, y: 61.5}, {id: 'P4-17', x: 63.5, y: 61.5}, {id: 'P4-18', x: 66.5, y: 61.5},
+                {id: 'P4-19', x: 69.5, y: 61.5}, {id: 'P4-20', x: 72.5, y: 61.5}, {id: 'P4-21', x: 75.5, y: 61.5},
+                {id: 'P4-22', x: 78.5, y: 61.5}, {id: 'P4-23', x: 81.5, y: 61.5}, {id: 'P4-24', x: 84.5, y: 61.5},
+                {id: 'P4-25', x: 87.5, y: 61.5}, {id: 'P4-26', x: 90.5, y: 61.5}, {id: 'P4-27', x: 93.5, y: 61.5},
+
+                // P5 series (fifth row)
+                {id: 'P5-1', x: 15.5, y: 52.5}, {id: 'P5-2', x: 18.5, y: 52.5}, {id: 'P5-3', x: 21.5, y: 52.5},
+                {id: 'P5-4', x: 24.5, y: 52.5}, {id: 'P5-5', x: 27.5, y: 52.5}, {id: 'P5-6', x: 30.5, y: 52.5},
+                {id: 'P5-7', x: 33.5, y: 52.5}, {id: 'P5-8', x: 36.5, y: 52.5}, {id: 'P5-9', x: 39.5, y: 52.5},
+                {id: 'P5-10', x: 42.5, y: 52.5}, {id: 'P5-11', x: 45.5, y: 52.5}, {id: 'P5-12', x: 48.5, y: 52.5},
+                {id: 'P5-13', x: 51.5, y: 52.5}, {id: 'P5-14', x: 54.5, y: 52.5}, {id: 'P5-15', x: 57.5, y: 52.5},
+                {id: 'P5-16', x: 60.5, y: 52.5}, {id: 'P5-17', x: 63.5, y: 52.5}, {id: 'P5-18', x: 66.5, y: 52.5},
+                {id: 'P5-19', x: 69.5, y: 52.5}, {id: 'P5-20', x: 72.5, y: 52.5}, {id: 'P5-21', x: 75.5, y: 52.5},
+                {id: 'P5-22', x: 78.5, y: 52.5}, {id: 'P5-23', x: 81.5, y: 52.5}, {id: 'P5-24', x: 84.5, y: 52.5},
+                {id: 'P5-25', x: 87.5, y: 52.5}, {id: 'P5-26', x: 90.5, y: 52.5}, {id: 'P5-27', x: 93.5, y: 52.5},
+
+                // Angled piles (A series)
+                {id: 'A1', x: 7.5, y: 43.5}, {id: 'A2', x: 10.5, y: 37.5}, {id: 'A3', x: 13.5, y: 31.5},
+                {id: 'A4', x: 16.5, y: 25.5}, {id: 'A5', x: 19.5, y: 19.5}, {id: 'A6', x: 22.5, y: 13.5},
+                {id: 'A7', x: 25.5, y: 7.5},
+
+                // Angled piles (B series)
+                {id: 'B1', x: 92.5, y: 43.5}, {id: 'B2', x: 89.5, y: 37.5}, {id: 'B3', x: 86.5, y: 31.5},
+                {id: 'B4', x: 83.5, y: 25.5}, {id: 'B5', x: 80.5, y: 19.5}, {id: 'B6', x: 77.5, y: 13.5},
+                {id: 'B7', x: 74.5, y: 7.5},
+
+                // Additional piles (C series)
+                {id: 'C1', x: 7.5, y: 52.5}, {id: 'C2', x: 7.5, y: 61.5}, {id: 'C3', x: 7.5, y: 70.5},
+                {id: 'C4', x: 7.5, y: 79.5}, {id: 'C5', x: 7.5, y: 88.5},
+
+                 // Additional piles (D series)
+                {id: 'D1', x: 92.5, y: 52.5}, {id: 'D2', x: 92.5, y: 61.5}, {id: 'D3', x: 92.5, y: 70.5},
+                {id: 'D4', x: 92.5, y: 79.5}, {id: 'D5', x: 92.5, y: 88.5},
+            ];
+
+            pilePositions = pilePositions202;
+
+            // Initialize pile data if it's empty
+            if (Object.keys(pileData).length === 0) {
+                pilePositions.forEach(pile => {
+                    pileData[pile.id] = {
+                        id: pile.id,
+                        name: pile.id,
+                        x: pile.x,
+                        y: pile.y,
+                        status: 'pending',
+                        castingDate: '',
+                        concreteVolume: 0,
+                        steelBars: 0,
+                        steelType: 'Grade 60',
+                        remarks: ''
+                    };
+                });
+            }
+            
+            console.log('Initialized', pilePositions.length, 'pile positions');
+        }
+    </script>
+</body>
+</html>
